@@ -63,6 +63,32 @@ def download_datasets(datasets, use_kaggle=True):
     if not surface_dir.exists() or len(list(surface_dir.glob("*/*.JPEG"))) < 5000:
         print("Surface faults missing (<5000), trying Kaggle mirror imenesabeur/test-xception...")
         run(f"kaggle datasets download -d imenesabeur/test-xception -p {ROOT}/datasets/track_surface_faults --unzip", check=False)
+    # Kaggle Input mount: if user added dataset via UI, copy from /kaggle/input
+    if Path("/kaggle/input").exists():
+        for inp in Path("/kaggle/input").glob("*railway-component*"):
+            print(f"Found Kaggle Input dataset: {inp}")
+            import shutil
+            dest = ROOT / "datasets" / "railsense"
+            dest.mkdir(parents=True, exist_ok=True)
+            # inp may contain data/ or direct component folders
+            src_data = inp / "data" if (inp / "data").exists() else inp
+            for comp in ["crossties","fasteners","fishplates","tracks"]:
+                if (src_data / comp).exists():
+                    run(f"cp -r {src_data/comp} {dest}/ 2>&1 | head", check=False)
+                elif (inp / comp).exists():
+                    run(f"cp -r {inp/comp} {dest}/ 2>&1 | head", check=False)
+        for inp in Path("/kaggle/input").glob("*surface*"):
+            print(f"Found Kaggle Input surface: {inp}")
+        # also handle generic railsense input name variations
+        for inp in Path("/kaggle/input").iterdir():
+            if inp.is_dir() and any((inp / c).exists() for c in ["crossties","fasteners"]):
+                print(f"Copying railsense from {inp} -> datasets/railsense")
+                import shutil
+                for c in ["crossties","fasteners","fishplates","tracks"]:
+                    if (inp / c).exists():
+                        run(f"cp -r {inp/c} {ROOT}/datasets/railsense/ 2>&1 | head", check=False)
+                    if (inp / "data" / c).exists():
+                        run(f"cp -r {inp/'data'/c} {ROOT}/datasets/railsense/ 2>&1 | head", check=False)
 
 def build_manifest():
     run(f"{sys.executable} ml/dataset_tools/convert_to_manifest.py --datasets railsense surface_faults")
