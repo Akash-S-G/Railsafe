@@ -1,0 +1,100 @@
+# Raw datasets — never commit (manifest only)
+datasets/railsense/
+datasets/track_surface_faults/*.zip
+datasets/track_surface_faults/*.jpg
+datasets/track_surface_faults/Railway\ Track\ Surface\ Faults\ Dataset/
+datasets/rfdd/*.h5
+datasets/rfdd/*.png
+datasets/rfdd/*.zip
+datasets/rfdd/RFDD-code/
+datasets/raildb/
+datasets/raildb/Rail-Detection-code/
+datasets/temporal/
+datasets/*.zip
+datasets/manifest.jsonl.bak
+# Kaggle cache
+datasets/track_surface_faults/test-xception.zip
+datasets/railsense/*.zip
+datasets/railsense/data/
+
+# Outputs / Logs
+output/
+runs/
+wandb/
+logs/
+*.log
+nohup.out
+lightning_logs/
+mlruns/
+outputs/
+results/
+checkpoints/
+*.csv
+!docs/**/*.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+.venv-railsense/
+.venv*/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+pip-log.txt
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+
+# Env / Secrets
+backend/.env
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+kaggle.json
+.kaggle/
+
+# Models / Weights
+*.keras
+*.pt
+*.ckpt
+*.pth
+*.onnx
+*.h5
+!datasets/**/*.h5
+yolo*.pt
+best_model.keras
+*.weights
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.code-workspace
+.jupyter/
+.ipynb_checkpoints/
+
+# Temp
+tmp/
+temp/
+*.tmp
+*.temp

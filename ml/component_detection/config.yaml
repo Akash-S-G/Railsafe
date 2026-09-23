@@ -1,0 +1,15 @@
+# YOLO component detection — Phase 3, Cloud GPU, grouped splits
+# Primary: yolo11m (20.1M, best RFDD 0.7106 mAP50:95), fallback yolo11n for ablation
+model: yolo11m.pt  # or yolo11n.pt for ablations/edge
+data_rfdd: datasets/rfdd/data.yaml        # to be generated in Phase 2 normalization
+data_surface: datasets/track_surface_faults/data.yaml
+imgsz: 640         # RFDD is 2048x2021 — will be tiled/resized
+epochs: 100
+batch: 16          # Cloud GPU
+lr0: 0.01
+augment: true      # mosaic, HSV, rotation + brightness for railway lighting
+split: grouped     # NEVER random frame split — group by sequence_id/video
+classes_rfdd: [Normal, Missing, Reversed, Displaced, Deformed, Broken]  # 6, aliases: Inverted/Broken=Fractured
+classes_surface: [Grooves, Joints, Cracks, Flakings, Shellings, Spallings, Squats]  # 7
+metrics: [mAP50, mAP50:95, Precision, Recall, F1]
+cross_dataset: true  # train RFDD -> test Surface for RQ6/H4

@@ -1,0 +1,16 @@
+# ML — Cloud GPU (CUDA 12)
+torch --index-url https://download.pytorch.org/whl/cu121
+torchvision
+ultralytics>=8.3.0  # YOLO11 (Sep 2024) + YOLO11m primary, RFDD mAP50:95 0.7106
+opencv-python
+timm
+scikit-learn
+albumentations
+numpy==1.26.4
+pillow==10.2.0
+anomalib>=1.0  # PaDiM + PatchCore
+wandb
+pycocotools
+matplotlib
+tqdm
+pyyaml
