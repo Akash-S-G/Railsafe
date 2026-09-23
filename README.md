@@ -152,16 +152,36 @@ Do not call v1 "predictive maintenance" for generating a risk score.
 
 ## 7. Quick Start
 
+### Train on Kaggle / Colab (1-click, recommended)
+
+```bash
+# Kaggle: New Notebook → Add Data → GitHub → YOUR/RAILSAFE → then:
+!python scripts/setup_kaggle.py --datasets railsense surface_faults
+!python scripts/train.py --task yolo --epochs 10 --model yolo11n.pt
+
+# Colab:
+!git clone https://github.com/YOUR/RAILSAFE.git && cd RAILSAFE
+!python scripts/setup_kaggle.py && python scripts/train.py --task yolo --epochs 10
+```
+See [`docs/training/README.md`](docs/training/README.md) + [`notebooks/Train_on_Kaggle_Colab.ipynb`](notebooks/Train_on_Kaggle_Colab.ipynb).
+
+### Local Quick Start
+
 ```bash
 # Phase 0 — audit datasets before any training
 # see docs/datasets/datasets.md
+bash datasets/download_railsense.sh        # 858 imgs via Kaggle API
+bash datasets/download_surface_faults.sh  # 5153 imgs (Mendeley mirror on Kaggle)
+python ml/dataset_tools/convert_to_manifest.py  # -> datasets/manifest.jsonl (6011 records, grouped, no leakage)
+python ml/dataset_tools/prepare_yolo.py         # -> datasets/yolo_surface + surface_data.yaml
 
 # Phase 1 — reproduce RailSense baseline (no modifications)
-git clone https://github.com/kashtennyson/RailSense
-cd RailSense && python main.py both  # per repo docs; logs to W&B
+# needs TF 2.16 in separate venv (see docs/training/README.md)
+python scripts/train.py --task railsense --epochs 5
 
-# Phase 3 — component detector (example)
-# ml/component_detection/train.py — YOLO on RFDD full-scene
+# Phase 3 — component detector (YOLO classify on surface_faults; RFDD 8.24GB gated)
+python scripts/train.py --task yolo --epochs 10 --model yolo11n.pt  # 2.6M fast, or yolo11m.pt 20.1M best
+# ml/component_detection/train.py — YOLO on RFDD full-scene (when RFDD present)
 
 # Phase 4 — integrated pipeline
 # Full frame -> detector -> crop -> railsense.predict(crop) -> fusion
