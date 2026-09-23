@@ -12,15 +12,13 @@ datasets/raildb/Rail-Detection-code/
 datasets/temporal/
 datasets/*.zip
 datasets/manifest.jsonl.bak
-# Kaggle cache + derived
+# Kaggle cache + derived (generated locally — do not commit to avoid Kaggle pull conflicts)
 datasets/track_surface_faults/test-xception.zip
 datasets/railsense/*.zip
 datasets/railsense/data/
 datasets/yolo_surface/
 datasets/surface_data.yaml
-# datasets/manifest.jsonl is committed (Phase 2) — do not ignore
-# uncomment next line to ignore if repo size matters:
-# datasets/manifest.jsonl
+datasets/manifest.jsonl
 
 # Outputs / Logs
 output/
