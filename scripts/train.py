@@ -67,22 +67,33 @@ def train_yolo(epochs=10, model="yolo11n.pt", task="classify", dry_run=False):
         run(f"{sys.executable} ml/dataset_tools/prepare_yolo.py")
     if dry_run:
         print(f"Dry run OK: {data_yaml} exists, {yolo_root} ready")
-        # print splits
         import json
         recs = [json.loads(l) for l in manifest.read_text().splitlines() if l.strip()]
         from collections import Counter
         print("Manifest:", Counter(r["dataset_id"] for r in recs))
+        # also verify yolo structure for classification
+        for split in ["train","val"]:
+            p = yolo_root / split
+            if p.exists():
+                print(f"  {split}: {len(list(p.rglob('*.JPEG')))+len(list(p.rglob('*.jpg')))} images, classes={[d.name for d in p.iterdir() if d.is_dir()]}")
         return
-    # ultralytics YOLO classification
     try:
         from ultralytics import YOLO
     except ImportError:
         print("ultralytics not installed. Install ml/requirements.txt")
         sys.exit(1)
-    print(f"Training YOLO {model} for {epochs} epochs on {data_yaml}")
+    # Auto-switch to classification model if user passed detection weights
+    # surface_faults is image-level classification (7 classes), not bbox detection
+    is_cls_task = True  # surface_faults is always classification
+    if is_cls_task and not model.endswith("-cls.pt"):
+        cls_model = model.replace(".pt", "-cls.pt")
+        print(f"Classification dataset detected — switching {model} -> {cls_model}")
+        model = cls_model
+    print(f"Training YOLO {model} for {epochs} epochs on {yolo_root} (classification)")
     yolo = YOLO(model)
-    # YOLO classify: data can be yaml or folder; we pass yaml for clarity
-    yolo.train(data=str(data_yaml), epochs=epochs, imgsz=224, batch=16, project=str(ROOT/"runs"/"yolo"), name="surface_classify")
+    # For classification, ultralytics expects data as folder path containing train/val subfolders
+    # See https://docs.ultralytics.com/tasks/classify/
+    yolo.train(data=str(yolo_root), epochs=epochs, imgsz=224, batch=16, project=str(ROOT/"runs"/"yolo"), name="surface_classify")
 
 def main():
     ap = argparse.ArgumentParser()
