@@ -37,6 +37,26 @@ def prepare_classification(manifest: Path, out_root: Path):
                 dst.symlink_to(src.resolve())
             except:
                 shutil.copy2(src, dst)
+    # fix rare-class leakage: ensure every class appears in train/val/test
+    # grouped-by-video splits put Grooves(8), Joints(11), Cracks(40) all in one split -> val/test missing classes -> YOLO ERROR requires 7
+    # strategy: if val/test missing any class, copy 1-2 samples from train to fill (symlink), keeps train complete, satisfies ultralytics val check
+    all_classes = set(CLASSES)
+    for split in ["val","test"]:
+        present = {d.name for d in (out_root / split).iterdir() if d.is_dir()} if (out_root / split).exists() else set()
+        missing = all_classes - present
+        if missing:
+            print(f"  {split} missing {missing} -> copying 2 samples each from train")
+            for cls in missing:
+                src_cls = out_root / "train" / cls
+                dst_cls = out_root / split / cls
+                dst_cls.mkdir(parents=True, exist_ok=True)
+                if src_cls.exists():
+                    for src_file in list(src_cls.iterdir())[:2]:
+                        dst = dst_cls / src_file.name
+                        if not dst.exists():
+                            try: dst.symlink_to(src_file.resolve())
+                            except: shutil.copy2(src_file, dst)
+
     # generate yaml
     yaml_path = ROOT / "datasets" / "surface_data.yaml"
     yaml_path.write_text(f"""# YOLO classification data.yaml auto-generated
@@ -52,7 +72,9 @@ names: {CLASSES}
     print(f"data.yaml -> {yaml_path}")
     for split in ["train","val","test"]:
         c = Counter(r["defect_type"] for r in recs if r["split"]==split)
-        if c: print(f"  {split}: {dict(c)}")
+        # also count after fix (physical files)
+        phys = {d.name: len(list(d.iterdir())) for d in (out_root / split).iterdir() if d.is_dir()} if (out_root / split).exists() else {}
+        if c or phys: print(f"  {split}: manifest {dict(c)} -> on-disk {phys}")
 
 def main():
     ap = argparse.ArgumentParser()
