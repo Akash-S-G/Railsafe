@@ -46,6 +46,7 @@ def eval_yolo(weights: Path, split="val"):
         print(f"Saved {p}: {out}")
     # also run severity/risk demo and save
     try:
+        sys.path.insert(0, str(ROOT))
         from ml.severity.severity_engine import compute_severity
         from ml.risk.risk_engine import compute_risk_v1
         demo = {
