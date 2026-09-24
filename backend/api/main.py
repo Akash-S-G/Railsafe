@@ -1,7 +1,8 @@
-import json, shutil, sys, uuid
+import json, shutil, sys, time, uuid
 from pathlib import Path
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 ROOT = Path(__file__).resolve().parents[2]
 PIPELINE_DIR = ROOT / "experiments" / "results" / "pipeline"
@@ -42,7 +43,10 @@ def _load_observations():
     if PIPELINE_DIR.exists():
         for p in PIPELINE_DIR.glob("*.json"):
             try:
-                records.append(json.loads(p.read_text()))
+                r = json.loads(p.read_text())
+                if "created_at" not in r:
+                    r["created_at"] = time.strftime("%Y-%m-%d %H:%M", time.localtime(p.stat().st_mtime))
+                records.append(r)
             except Exception:
                 pass
     return records
@@ -68,19 +72,31 @@ def stats():
         "critical": cnt(lambda r: r.get("risk", {}).get("level") == "CRITICAL"),
     }
 
-@app.post("/inspections")
-async def create_inspection(
-    file: UploadFile = File(...),
-    chainage: float = Form(124320.0),
-    track: str = Form("UP"),
-    line: str = Form("LINE-01"),
-):
+@app.get("/inspections")
+def list_inspections():
+    """Past predictions — newest first, with servable image path."""
+    records = _load_observations()
+    records.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return records
+
+@app.get("/image/{path:path}")
+def get_image(path: str):
+    """Serve stored images (uploads/pipeline/datasets) with path-traversal protection."""
+    full = (ROOT / path).resolve()
+    allowed = [(ROOT / "experiments" / "results").resolve(), (ROOT / "datasets").resolve()]
+    if not any(str(full).startswith(str(r)) for r in allowed):
+        raise HTTPException(status_code=403, detail="path not allowed")
+    if not full.is_file():
+        raise HTTPException(status_code=404, detail="image not found")
+    return FileResponse(full)
+
+def _process_one(upload: UploadFile, chainage: float, track: str, line: str):
     from ml.severity.severity_engine import compute_severity
     from ml.risk.risk_engine import compute_risk_v1
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    dest = UPLOAD_DIR / f"{uuid.uuid4().hex}_{Path(file.filename).name}"
+    dest = UPLOAD_DIR / f"{uuid.uuid4().hex}_{Path(upload.filename).name}"
     with open(dest, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+        shutil.copyfileobj(upload.file, f)
     yolo = get_yolo()
     res = yolo.predict(str(dest), verbose=False)[0]
     defect_type = yolo.names[res.probs.top1]
@@ -106,7 +122,22 @@ async def create_inspection(
         "chainage_m": chainage,
         "track_id": track,
         "line_id": line,
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     PIPELINE_DIR.mkdir(parents=True, exist_ok=True)
     (PIPELINE_DIR / f"{dest.stem}.json").write_text(json.dumps(out, indent=2))
     return out
+
+@app.post("/inspections")
+async def create_inspections(
+    files: list[UploadFile] = File(None),
+    file: UploadFile = File(None),
+    chainage: float = Form(124320.0),
+    track: str = Form("UP"),
+    line: str = Form("LINE-01"),
+):
+    """Batch prediction: accepts multiple files under 'files' (or single 'file' for compat)."""
+    uploads = files or ([file] if file else [])
+    if not uploads:
+        raise HTTPException(status_code=422, detail="no files provided")
+    return [_process_one(u, chainage, track, line) for u in uploads]
