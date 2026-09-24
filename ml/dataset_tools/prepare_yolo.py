@@ -82,14 +82,77 @@ names: {CLASSES}
         phys = {d.name: len(list(d.iterdir())) for d in (out_root / split).iterdir() if d.is_dir()} if (out_root / split).exists() else {}
         if c or phys: print(f"  {split}: manifest {dict(c)} -> on-disk {phys}")
 
+def prepare_multiclass(manifest: Path, out_root: Path):
+    """3-class layout: Normal / Fastener_defective / Rail_defective from kaggle_multiclass.
+    Complementary head to the 7-class surface model (per-dataset heads, taxonomy.md)."""
+    recs = [json.loads(l) for l in manifest.read_text().splitlines() if l.strip()]
+    recs = [r for r in recs if r["dataset_id"]=="kaggle_multiclass"]
+    if not recs:
+        print("No kaggle_multiclass records in manifest. Run convert_to_manifest.py --datasets kaggle_multiclass first.")
+        return
+    if out_root.exists():
+        shutil.rmtree(out_root)
+    for r in recs:
+        src = ROOT / r["source"]
+        split = r["split"]
+        # label: Normal for non-defective, else defect_type (folder name)
+        cls = "Normal" if r["defect_type"] is None else r["defect_type"]
+        dst = out_root / split / cls / Path(r["source"]).name
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if src.exists():
+            try:
+                dst.symlink_to(src.resolve())
+            except:
+                shutil.copy2(src, dst)
+    # ensure all 3 classes in every split (copy from another split if missing)
+    all_classes = {"Normal", "Fastener_defective", "Rail_defective"}
+    for split in ["train","val","test"]:
+        present = {d.name for d in (out_root / split).iterdir() if d.is_dir()} if (out_root / split).exists() else set()
+        missing = all_classes - present
+        if missing:
+            print(f"  {split} missing {missing} -> copying 2 samples each")
+            for cls in missing:
+                src_cls = None
+                for src_split in ["train","val","test"]:
+                    cand = out_root / src_split / cls
+                    if cand.exists() and any(cand.iterdir()):
+                        src_cls = cand
+                        break
+                dst_cls = out_root / split / cls
+                dst_cls.mkdir(parents=True, exist_ok=True)
+                if src_cls:
+                    for src_file in list(src_cls.iterdir())[:2]:
+                        dst = dst_cls / src_file.name
+                        if not dst.exists():
+                            try: dst.symlink_to(src_file.resolve())
+                            except: shutil.copy2(src_file, dst)
+    yaml_path = ROOT / "datasets" / "multiclass_data.yaml"
+    yaml_path.write_text(f"""# YOLO classification data.yaml auto-generated (kaggle_multiclass 3-class)
+path: {out_root}
+train: {out_root}/train
+val: {out_root}/val
+test: {out_root}/test
+nc: 3
+names: ['Normal', 'Fastener_defective', 'Rail_defective']
+""")
+    cnt = Counter(r["split"] for r in recs)
+    print(f"YOLO multiclass layout -> {out_root} : {dict(cnt)}")
+    print(f"data.yaml -> {yaml_path}")
+    for split in ["train","val","test"]:
+        p = out_root / split
+        phys = {d.name: len(list(d.iterdir())) for d in p.iterdir() if d.is_dir()} if p.exists() else {}
+        if phys: print(f"  {split}: {phys}")
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--manifest", type=Path, default=ROOT/"datasets"/"manifest.jsonl")
     ap.add_argument("--out", type=Path, default=ROOT/"datasets"/"yolo_surface")
-    ap.add_argument("--task", choices=["classify","detect"], default="classify")
+    ap.add_argument("--task", choices=["classify","multiclass","detect"], default="classify")
     args = ap.parse_args()
     if args.task=="classify":
         prepare_classification(args.manifest, args.out)
+    elif args.task=="multiclass":
+        prepare_multiclass(args.manifest, args.out / "../yolo_multiclass" if str(args.out).endswith("yolo_surface") else args.out)
     else:
         print("detect task requires RFDD bboxes (gated).")
 
