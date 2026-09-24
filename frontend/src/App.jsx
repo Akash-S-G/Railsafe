@@ -1,81 +1,133 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
 
 const API = 'http://localhost:8000'
 
 export default function App() {
   const [health, setHealth] = useState(null)
-  const [assets, setAssets] = useState([
-    { id: 'FASTENER-001821', km: '124+320', risk: 86, level: 'CRITICAL', anomaly: 0.82, trend: '↑ RAPID' },
-    { id: 'RAIL-000341', km: '12.43', risk: 91, level: 'CRITICAL', anomaly: 0.91, trend: '→ STABLE' },
-    { id: 'FISHPLATE-00012', km: '18.77', risk: 76, level: 'HIGH', anomaly: 0.71, trend: '↑ SLOW' },
-  ])
+  const [assets, setAssets] = useState([])
+  const [stats, setStats] = useState({ inspected: 0, normal: 0, suspicious: 0, high_risk: 0, critical: 0 })
+  const [result, setResult] = useState(null)
+  const [processing, setProcessing] = useState(false)
+  const [chainage, setChainage] = useState('124320')
+  const fileRef = useRef(null)
+
+  const refresh = () => {
+    axios.get(`${API}/queue`).then(r => Array.isArray(r.data) && setAssets(r.data)).catch(() => {})
+    axios.get(`${API}/stats`).then(r => setStats(r.data)).catch(() => {})
+  }
 
   useEffect(() => {
-    axios.get(`${API}/health`).then(r => setHealth(r.data)).catch(() => setHealth({ status: 'offline', version: 'v1' }))
-    // Try to load live queue from backend, fallback to static queue.json
-    axios.get(`${API}/queue`).then(r => r.data.length && setAssets(r.data.map(a=>({
-      id: a.asset_id, km: String(a.chainage_m), risk: a.risk.risk, level: a.risk.level, anomaly: a.anomaly, trend: a.status
-    })))).catch(() => {
-      fetch('/queue.json').then(r=>r.json()).then(data=> data.length && setAssets(data.map(a=>({
-        id: a.asset_id, km: String(a.chainage_m), risk: a.risk.risk, level: a.risk.level, anomaly: a.anomaly, trend: a.status
-      })))).catch(()=>{})
-    })
+    axios.get(`${API}/health`).then(r => setHealth(r.data)).catch(() => setHealth({ status: 'offline' }))
+    refresh()
   }, [])
+
+  const runInspection = async () => {
+    const file = fileRef.current?.files?.[0]
+    if (!file) { alert('Select an image first'); return }
+    setProcessing(true); setResult(null)
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('chainage', chainage || '124320')
+    fd.append('track', 'UP')
+    fd.append('line', 'LINE-01')
+    try {
+      const r = await axios.post(`${API}/inspections`, fd)
+      setResult(r.data)
+      refresh()
+    } catch (e) {
+      alert('Inspection failed: ' + (e.response?.data?.detail || e.message))
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const kpis = [
+    ['Inspected', stats.inspected], ['Normal', stats.normal], ['Suspicious', stats.suspicious],
+    ['High Risk', stats.high_risk], ['Critical', stats.critical],
+  ]
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="border-b border-zinc-800 p-4 flex justify-between items-center">
         <h1 className="text-xl font-bold tracking-tight">RAILSAFE <span className="text-zinc-500 font-normal">Railway Infrastructure Health</span></h1>
-        <span className={`text-xs px-2 py-1 rounded ${health?.status==='ok' ? 'bg-emerald-900 text-emerald-200' : 'bg-zinc-800 text-zinc-400'}`}>
+        <span className={`text-xs px-2 py-1 rounded ${health?.status === 'ok' ? 'bg-emerald-900 text-emerald-200' : 'bg-zinc-800 text-zinc-400'}`}>
           API {health?.status || 'checking...'} {health?.version || ''} {health?.temporal || ''}
         </span>
       </header>
 
       <main className="max-w-6xl mx-auto p-6 grid gap-6">
-        {/* KPIs */}
+        {/* KPIs — live from /stats */}
         <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {[
-            ['Inspected','12,450'],['Normal','11,930'],['Suspicious','382'],['High Risk','104'],['Critical','34']
-          ].map(([k,v])=>(
+          {kpis.map(([k, v]) => (
             <div key={k} className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
               <div className="text-xs text-zinc-500">{k}</div>
-              <div className="text-2xl font-mono">{v}</div>
+              <div className="text-2xl font-mono">{v ?? 0}</div>
             </div>
           ))}
         </section>
 
-        {/* Map placeholder */}
-        <section className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 h-[340px] flex flex-col">
-          <h2 className="font-semibold mb-2">Railway Map <span className="text-zinc-500 text-sm">Leaflet — risk-colored pins (LOW 🟢 MEDIUM 🟡 HIGH 🟠 CRITICAL 🔴)</span></h2>
-          <div className="flex-1 border border-dashed border-zinc-700 rounded flex items-center justify-center text-zinc-500 text-sm">
-            Leaflet map renders here — filter by risk / component / line+chainage. Backend GET /assets?line=&chainage_from=&chainage_to
+        {/* Inspect — upload image, run pipeline */}
+        <section className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+          <h2 className="font-semibold mb-3">Inspect Image <span className="text-zinc-500 text-sm">YOLO → fusion → severity → risk</span></h2>
+          <div className="flex flex-wrap gap-3 items-center">
+            <input ref={fileRef} type="file" accept="image/*" data-testid="file-input"
+              className="text-sm file:mr-3 file:px-3 file:py-1 file:rounded file:border-0 file:bg-zinc-800 file:text-zinc-200" />
+            <label className="text-xs text-zinc-500">Chainage (m)
+              <input value={chainage} onChange={e => setChainage(e.target.value)} data-testid="chainage-input"
+                className="ml-2 w-28 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm font-mono" />
+            </label>
+            <button onClick={runInspection} disabled={processing} data-testid="inspect-button"
+              className="px-4 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-sm font-semibold">
+              {processing ? 'Running...' : 'Run Inspection'}
+            </button>
           </div>
-          <div className="mt-3 flex gap-2 text-xs">
-            {assets.map(a=>(
-              <span key={a.id} className={`px-2 py-1 rounded ${a.level==='CRITICAL'?'bg-red-900 text-red-100': a.level==='HIGH'?'bg-orange-900 text-orange-100':'bg-zinc-800'}`}>
-                {a.id} KM{a.km} {a.risk}
-              </span>
-            ))}
-          </div>
+
+          {result && (
+            <div className="mt-4 border border-zinc-700 rounded p-4 grid md:grid-cols-2 gap-4" data-testid="result-card">
+              <div className="text-sm space-y-1">
+                <div className="text-xs text-zinc-500">Asset {result.asset_id} · KM {result.chainage_m} · {result.line_id}/{result.track_id}</div>
+                <div>Defect: <span className="font-mono">{result.known_defect.type}</span> ({(result.known_defect.confidence * 100).toFixed(1)}%)</div>
+                <div>Anomaly (heuristic): <span className="font-mono">{result.anomaly}</span></div>
+                <div>Status: <span className={`px-2 py-0.5 rounded text-xs ${result.status === 'KNOWN_DEFECT' ? 'bg-red-900 text-red-100' : result.status === 'UNKNOWN_ABNORMALITY' ? 'bg-yellow-900 text-yellow-100' : 'bg-emerald-900 text-emerald-100'}`}>{result.status}</span></div>
+                <div>Severity: <span className="font-mono">{result.severity.severity}</span> {result.severity.level}</div>
+                <div>Risk: <span className="font-mono">{result.risk.risk}</span>/100 {result.risk.level}</div>
+                <div className="text-xs text-zinc-400">Recommendation: {result.risk.recommendation}</div>
+              </div>
+              <div className="text-xs font-mono text-zinc-500">
+                Contributors — severity: {Object.entries(result.severity.contributors).map(([k, v]) => `${k} ${v}`).join(', ')}
+                <br />risk: {Object.entries(result.risk.contributors).map(([k, v]) => `${k} ${v}`).join(', ')}
+              </div>
+            </div>
+          )}
         </section>
 
-        {/* Queue */}
+        {/* Queue — live from /queue */}
         <section className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
           <h2 className="font-semibold mb-3">Maintenance Queue <span className="text-zinc-500 text-sm">sorted by R = w1S+…</span></h2>
-          <table className="w-full text-sm">
-            <thead className="text-zinc-500"><tr><th className="text-left py-1">Priority</th><th className="text-left">Component</th><th className="text-left">KM</th><th className="text-left">Risk</th><th className="text-left">Level</th></tr></thead>
-            <tbody className="font-mono">
-              {assets.map((a,i)=>(
-                <tr key={a.id} className="border-t border-zinc-800"><td className="py-2">{i+1}</td><td>{a.id}</td><td>{a.km}</td><td>{a.risk}</td><td>{a.level}</td></tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="mt-2 text-xs text-zinc-500">Backend: GET /assets?chainage_from=... Phase 8 PostGIS. Temporal gated.</div>
+          {assets.length === 0 ? (
+            <div className="text-sm text-zinc-500 py-4" data-testid="queue-empty">No inspections yet — upload an image above.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-zinc-500"><tr><th className="text-left py-1">#</th><th className="text-left">Asset</th><th className="text-left">Chainage</th><th className="text-left">Defect</th><th className="text-left">Risk</th><th className="text-left">Level</th></tr></thead>
+              <tbody className="font-mono">
+                {assets.map(a => (
+                  <tr key={a.asset_id + a.image} className="border-t border-zinc-800">
+                    <td className="py-2">{a.priority}</td>
+                    <td>{a.asset_id}</td>
+                    <td>{a.chainage_m}</td>
+                    <td>{a.known_defect?.type}</td>
+                    <td>{a.risk?.risk}</td>
+                    <td className={a.risk?.level === 'CRITICAL' ? 'text-red-400' : a.risk?.level === 'HIGH' ? 'text-orange-400' : ''}>{a.risk?.level}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </section>
 
         <section className="text-xs text-zinc-600">
-          Frontend: React 18 + Vite 5 + Tailwind + Leaflet + Recharts + Axios. See docs/architecture/dashboard.md.
+          Frontend: React 18 + Vite 5 + Tailwind + Axios. API: POST /inspections, GET /queue, GET /stats (see docs/architecture/dashboard.md). Temporal gated.
         </section>
       </main>
     </div>

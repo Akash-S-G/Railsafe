@@ -38,23 +38,29 @@ def prepare_classification(manifest: Path, out_root: Path):
             except:
                 shutil.copy2(src, dst)
     # fix rare-class leakage: ensure every class appears in train/val/test
-    # grouped-by-video splits put Grooves(8), Joints(11), Cracks(40) all in one split -> val/test missing classes -> YOLO ERROR requires 7
-    # strategy: if val/test missing any class, copy 1-2 samples from train to fill (symlink), keeps train complete, satisfies ultralytics val check
+    # grouped-by-video splits put Grooves(8), Joints(11), Cracks(40) all in one split -> splits missing classes -> YOLO ERROR requires 7
+    # strategy: for each split missing a class, copy 2 samples from any split that has it (train first, then val/test)
     all_classes = set(CLASSES)
-    for split in ["val","test"]:
+    for split in ["train","val","test"]:
         present = {d.name for d in (out_root / split).iterdir() if d.is_dir()} if (out_root / split).exists() else set()
         missing = all_classes - present
         if missing:
-            print(f"  {split} missing {missing} -> copying 2 samples each from train")
+            print(f"  {split} missing {missing} -> copying 2 samples each from other splits")
             for cls in missing:
-                src_cls = out_root / "train" / cls
+                # find source that has this class
+                src_cls = None
+                for src_split in ["train","val","test"]:
+                    cand = out_root / src_split / cls
+                    if cand.exists() and any(cand.iterdir()):
+                        src_cls = cand
+                        break
                 dst_cls = out_root / split / cls
                 dst_cls.mkdir(parents=True, exist_ok=True)
-                if src_cls.exists():
+                if src_cls and src_cls.exists():
                     for src_file in list(src_cls.iterdir())[:2]:
                         dst = dst_cls / src_file.name
                         if not dst.exists():
-                            try: dst.symlink_to(src_file.resolve())
+                            try: dst.symlink_to(src_file.resolve() if src_file.is_symlink() else src_file.resolve())
                             except: shutil.copy2(src_file, dst)
 
     # generate yaml
