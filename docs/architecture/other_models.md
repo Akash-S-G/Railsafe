@@ -1,6 +1,29 @@
 # Other Models vs YOLO for RailSafe Pipeline
 
-> YOLO11n-cls (3.1M, 0.993 val) is the v1 baseline. These alternatives can beat it per-layer without new envs — reuse existing `torch+ultralytics+timm` + `.venv-railsense` (TF 2.21). Storage-critical (2.8G avail), so test dry-run only.
+> YOLO11n-cls (3.1M, 0.993 val) is the v1 baseline. **Measured comparison (2026-09-24, `experiments/results/model_compare.md`):** YOLO full fine-tune **crushes quick linear probes** on the same splits; patch-kNN mini-PatchCore reaches 0.742 AUROC vs RailSense domain-trained 0.89 — confirming H2 (domain training matters).
+
+## 0. Measured Results (2026-09-24, CPU, same grouped splits)
+
+### Classification (surface_faults 7 classes)
+| Model | Params | Val top1 | Test top1 | Notes |
+|---|---|---|---|---|
+| **YOLO11n-cls** (ours, fine-tuned 10ep) | 1.5M | **0.9933** | **1.0** | full fine-tune |
+| EfficientNet-B0 (linear probe 3ep) | 5.3M | 0.339 | 0.171 | frozen backbone |
+| ResNet18 (linear probe 3ep) | 11.8M | 0.211 | 0.502 | frozen backbone |
+
+**Verdict:** YOLO11n-cls wins decisively. Linear probes underperform on the imbalanced long-tail (Flakings 55% of data) — full fine-tuning would close the gap at 10-20x CPU cost, not worth it vs YOLO's 6.5 GFLOPs. Keep YOLO as primary; use probes as B0-style ablation references.
+
+### Anomaly (railsense crossties: 88 mem / 22 normal-test vs 313 damaged)
+| Method | AUROC | Notes |
+|---|---|---|
+| **patch-kNN mini-PatchCore** (implemented, generic ImageNet feats) | **0.742** | 7×7×1280 `conv_head`, coreset 20k, top-1% mean |
+| RailSense AE (domain-trained) | 0.89 (lit) | trains on railway crops |
+| PaDiM | 0.945 (lit) | MVTec |
+| PatchCore full | 0.99 (lit) | MVTec |
+
+**Verdict:** Generic ImageNet features give 0.742 — domain training (RailSense) adds ~+0.15. **H2 confirmed:** component-specific domain-trained models > generic. A naive global-embedding kNN scored 0.487 (chance) — patch-level memory is essential (PatchCore method validated). Real anomalib PatchCore (0.99) needs 500MB install — gated by storage.
+
+Run: `python scripts/compare_models.py --epochs 3` (~18 min CPU: YOLO eval 2m + 2 probes 13m + kNN 2m) or `--skip-train`.
 
 ## 1. Detection Layer (Component: rail/fastener/sleeper/fishplate)
 

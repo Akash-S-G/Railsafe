@@ -1,0 +1,56 @@
+{
+  "timestamp": "2026-09-24 14:20",
+  "task": "compare models on yolo_surface splits + railsense anomaly",
+  "classification": {
+    "yolo": {
+      "model": "yolo11n-cls (3.1M, trained 10ep)",
+      "params": "1.5M",
+      "val": {
+        "top1": 0.9933,
+        "top5": 1.0
+      },
+      "test": {
+        "top1": 1.0,
+        "top5": 1.0
+      }
+    },
+    "efficientnet_b0": {
+      "model": "efficientnet_b0 (5.3M, linear probe)",
+      "val": {
+        "top1": 0.339,
+        "top5": 0.9896,
+        "n": 1640
+      },
+      "test": {
+        "top1": 0.1707,
+        "top5": 0.8485,
+        "n": 627
+      }
+    },
+    "resnet18": {
+      "model": "resnet18 (11.8M, linear probe)",
+      "val": {
+        "top1": 0.211,
+        "top5": 0.9945,
+        "n": 1640
+      },
+      "test": {
+        "top1": 0.5024,
+        "top5": 0.9298,
+        "n": 627
+      }
+    }
+  },
+  "anomaly": {
+    "model": "patch-kNN (mini-PatchCore: efficientnet_b0 conv_head 7x7x1280, coreset 20k, top-1% mean, generic ImageNet features)",
+    "auroc": 0.7419,
+    "n_memory_imgs": 88,
+    "n_anomaly": 313,
+    "n_normal_test": 22,
+    "lit_compare": {
+      "railsense_ae_domain_trained": 0.89,
+      "padim": 0.945,
+      "patchcore": 0.99
+    }
+  }
+}
