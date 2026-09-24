@@ -5,7 +5,7 @@ const API = 'http://localhost:8000'
 
 export default function App() {
   const [health, setHealth] = useState(null)
-  const [assets] = useState([
+  const [assets, setAssets] = useState([
     { id: 'FASTENER-001821', km: '124+320', risk: 86, level: 'CRITICAL', anomaly: 0.82, trend: '↑ RAPID' },
     { id: 'RAIL-000341', km: '12.43', risk: 91, level: 'CRITICAL', anomaly: 0.91, trend: '→ STABLE' },
     { id: 'FISHPLATE-00012', km: '18.77', risk: 76, level: 'HIGH', anomaly: 0.71, trend: '↑ SLOW' },
@@ -13,6 +13,14 @@ export default function App() {
 
   useEffect(() => {
     axios.get(`${API}/health`).then(r => setHealth(r.data)).catch(() => setHealth({ status: 'offline', version: 'v1' }))
+    // Try to load live queue from backend, fallback to static queue.json
+    axios.get(`${API}/queue`).then(r => r.data.length && setAssets(r.data.map(a=>({
+      id: a.asset_id, km: String(a.chainage_m), risk: a.risk.risk, level: a.risk.level, anomaly: a.anomaly, trend: a.status
+    })))).catch(() => {
+      fetch('/queue.json').then(r=>r.json()).then(data=> data.length && setAssets(data.map(a=>({
+        id: a.asset_id, km: String(a.chainage_m), risk: a.risk.risk, level: a.risk.level, anomaly: a.anomaly, trend: a.status
+      })))).catch(()=>{})
+    })
   }, [])
 
   return (

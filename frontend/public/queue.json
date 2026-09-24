@@ -1,0 +1,102 @@
+[
+  {
+    "image": "datasets/yolo_surface/test/Squats/7.MOV_20201228114152_5894.JPEG",
+    "component_type": "rail",
+    "known_defect": {
+      "type": "Squats",
+      "confidence": 0.99
+    },
+    "anomaly": 0.85,
+    "status": "KNOWN_DEFECT",
+    "bbox": [
+      0,
+      0,
+      224,
+      224
+    ],
+    "heatmap_path": null,
+    "condition": {
+      "A": 0.85,
+      "D": "Squats",
+      "S": 0.774,
+      "L": 13000.0,
+      "Q": "CRITICAL"
+    },
+    "severity": {
+      "severity": 0.774,
+      "level": "CRITICAL",
+      "contributors": {
+        "D": 0.24,
+        "A": 0.297,
+        "G": 0.046,
+        "C": 0.19
+      }
+    },
+    "risk": {
+      "risk": 69.9,
+      "level": "HIGH",
+      "recommendation": "PRIORITY INSPECTION",
+      "contributors": {
+        "S": 31.0,
+        "C": 23.8,
+        "A": 6.2,
+        "L": 9.0
+      }
+    },
+    "asset_id": "RAIL-13000.0-UP",
+    "chainage_m": 13000.0,
+    "track_id": "UP",
+    "line_id": "LINE-01",
+    "priority": 1
+  },
+  {
+    "image": "datasets/yolo_surface/test/Flakings/7.MOV_20201228114152_5081.JPEG",
+    "component_type": "rail",
+    "known_defect": {
+      "type": "Flakings",
+      "confidence": 0.998
+    },
+    "anomaly": 0.45,
+    "status": "KNOWN_DEFECT",
+    "bbox": [
+      0,
+      0,
+      224,
+      224
+    ],
+    "heatmap_path": null,
+    "condition": {
+      "A": 0.45,
+      "D": "Flakings",
+      "S": 0.554,
+      "L": 124320.0,
+      "Q": "HIGH"
+    },
+    "severity": {
+      "severity": 0.554,
+      "level": "HIGH",
+      "contributors": {
+        "D": 0.18,
+        "A": 0.158,
+        "G": 0.027,
+        "C": 0.19
+      }
+    },
+    "risk": {
+      "risk": 58.5,
+      "level": "HIGH",
+      "recommendation": "PRIORITY INSPECTION",
+      "contributors": {
+        "S": 22.2,
+        "C": 23.8,
+        "A": 3.6,
+        "L": 9.0
+      }
+    },
+    "asset_id": "RAIL-124320.0-UP",
+    "chainage_m": 124320.0,
+    "track_id": "UP",
+    "line_id": "LINE-01",
+    "priority": 2
+  }
+]
