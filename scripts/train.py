@@ -56,22 +56,30 @@ def train_railsense(epochs=5, batch=16):
     # train fasteners only for speed (257 images)
     run(f"cd {rs_code} && python main.py both --epochs {epochs} --batch_size {batch} --run_name kaggle-fastener")
 
-def train_yolo(epochs=10, model="yolo11n.pt", task="classify", dry_run=False):
+def train_yolo(epochs=10, model="yolo11n.pt", task="classify", dry_run=False, dataset="surface"):
+    """dataset: surface (7-class) or multiclass (3-class Normal/Fastener_defective/Rail_defective)"""
     manifest = ROOT / "datasets" / "manifest.jsonl"
     if not manifest.exists():
         print("manifest.jsonl missing — running convert_to_manifest.py")
-        run(f"{sys.executable} ml/dataset_tools/convert_to_manifest.py --datasets railsense surface_faults")
-    data_yaml = ROOT / "datasets" / "surface_data.yaml"
-    yolo_root = ROOT / "datasets" / "yolo_surface"
+        run(f"{sys.executable} ml/dataset_tools/convert_to_manifest.py --datasets railsense surface_faults kaggle_multiclass")
+    if dataset == "multiclass":
+        data_yaml = ROOT / "datasets" / "multiclass_data.yaml"
+        yolo_root = ROOT / "datasets" / "yolo_multiclass"
+        run_name = "multiclass_cls"
+        prep_args = "--task multiclass"
+    else:
+        data_yaml = ROOT / "datasets" / "surface_data.yaml"
+        yolo_root = ROOT / "datasets" / "yolo_surface"
+        run_name = "surface_classify"
+        prep_args = ""
     if not data_yaml.exists() or not yolo_root.exists():
-        run(f"{sys.executable} ml/dataset_tools/prepare_yolo.py")
+        run(f"{sys.executable} ml/dataset_tools/prepare_yolo.py {prep_args}".strip())
     if dry_run:
         print(f"Dry run OK: {data_yaml} exists, {yolo_root} ready")
         import json
         recs = [json.loads(l) for l in manifest.read_text().splitlines() if l.strip()]
         from collections import Counter
         print("Manifest:", Counter(r["dataset_id"] for r in recs))
-        # also verify yolo structure for classification
         for split in ["train","val"]:
             p = yolo_root / split
             if p.exists():
@@ -83,21 +91,17 @@ def train_yolo(epochs=10, model="yolo11n.pt", task="classify", dry_run=False):
         print("ultralytics not installed. Install ml/requirements.txt")
         sys.exit(1)
     # Auto-switch to classification model if user passed detection weights
-    # surface_faults is image-level classification (7 classes), not bbox detection
-    is_cls_task = True  # surface_faults is always classification
-    if is_cls_task and not model.endswith("-cls.pt"):
+    if not model.endswith("-cls.pt"):
         cls_model = model.replace(".pt", "-cls.pt")
         print(f"Classification dataset detected — switching {model} -> {cls_model}")
         model = cls_model
-    print(f"Training YOLO {model} for {epochs} epochs on {yolo_root} (classification)")
+    print(f"Training YOLO {model} for {epochs} epochs on {yolo_root} (classification, {dataset})")
     yolo = YOLO(model)
-    # For classification, ultralytics expects data as folder path containing train/val subfolders
-    # See https://docs.ultralytics.com/tasks/classify/
-    yolo.train(data=str(yolo_root), epochs=epochs, imgsz=224, batch=16, project=str(ROOT/"runs"/"yolo"), name="surface_classify")
+    yolo.train(data=str(yolo_root), epochs=epochs, imgsz=224, batch=16, project=str(ROOT/"runs"/"yolo"), name=run_name)
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--task", choices=["railsense","yolo","all"], default="yolo", help="what to train")
+    ap.add_argument("--task", choices=["railsense","yolo","multiclass","all"], default="yolo", help="what to train")
     ap.add_argument("--epochs", type=int, default=10)
     ap.add_argument("--model", type=str, default="yolo11n.pt", help="yolo model: yolo11n.pt (2.6M fast) or yolo11m.pt (20.1M best)")
     ap.add_argument("--dry-run", action="store_true", help="only check data, don't train")
@@ -107,7 +111,9 @@ def main():
     if args.task in ["railsense","all"]:
         train_railsense(epochs=min(args.epochs, 5) if args.task=="all" else args.epochs, batch=args.batch)
     if args.task in ["yolo","all"]:
-        train_yolo(epochs=args.epochs, model=args.model, dry_run=args.dry_run)
+        train_yolo(epochs=args.epochs, model=args.model, dry_run=args.dry_run, dataset="surface")
+    if args.task in ["multiclass","all"]:
+        train_yolo(epochs=args.epochs, model=args.model, dry_run=args.dry_run, dataset="multiclass")
 
     print("\nDone. Check runs/yolo/ and datasets/manifest.jsonl")
     print("Next: python ml/severity/severity_engine.py + ml/risk/risk_engine.py for severity/risk demo")

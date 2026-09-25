@@ -38,18 +38,28 @@ Add Kaggle Secrets `KAGGLE_USERNAME` + `KAGGLE_KEY` (from kaggle.com/settings �
 ## 3. Training Tasks
 
 ```bash
-# YOLO classification on surface_faults (works now, no RFDD needed)
-python scripts/train.py --task yolo --epochs 5 --model yolo11n.pt   # 2.6M, fast, ~10 min
-python scripts/train.py --task yolo --epochs 100 --model yolo11m.pt # 20.1M, best per ml/component_detection/config.yaml:3 (0.7106 mAP50:95)
+# Surface head — 7-class rail surface defects (5153 imgs, works now)
+python scripts/train.py --task yolo --epochs 10 --model yolo11n.pt    # 2.6M fast, ~10 min T4
+python scripts/train.py --task yolo --epochs 100 --model yolo11m.pt   # 20.1M, best per ml/component_detection/config.yaml:3 (0.7106 mAP50:95)
 
-# RailSense anomaly (needs TF, ~30 min CPU per component)
-pip install tensorflow==2.16.1  # only for Phase 1
-python scripts/train.py --task railsense --epochs 5
+# Multiclass head — 3-class Normal/Fastener_defective/Rail_defective (1185 imgs, ~2 min)
+# Complementary head: adds the missing Normal class + fastener/rail defective (per-dataset heads, taxonomy.md)
+python scripts/train.py --task multiclass --epochs 10 --model yolo11n.pt
 
-# Both + dry-run check
-python scripts/train.py --task yolo --dry-run
-python scripts/train.py --task all --epochs 5
+# Both heads + dry-run checks
+python scripts/train.py --task yolo --dry-run && python scripts/train.py --task multiclass --dry-run
+python scripts/train.py --task all --epochs 10
 ```
+
+### Datasets (3 public, one command)
+
+| Dataset | Source | Size | Layout |
+|---|---|---|---|
+| RailSense | `kashtennyson/railway-component-dataset` (Kaggle API) | 858 imgs | `crossties/fasteners/fishplates/tracks × normal/damaged` |
+| Surface Faults | Mendeley `10.17632/8hxtgyyxrw.2` → mirror `imenesabeur/test-xception` | 5153 imgs, 7 classes | class folders |
+| Multiclass | `salmaneunus/railwayfaultmulticlassdataset` (public, auto) | 1185 imgs, 3 classes | `All_non-defective/Fastener_defective/Rail_defective` |
+
+Splits (auto, no leakage): surface video-grouped (val = median video), multiclass IMG-dates grouped + instagram image-level stratified. Manifest: 7196 records, 13 groups verified.
 
 ## 4. Dataset Handling on Kaggle/Colab
 

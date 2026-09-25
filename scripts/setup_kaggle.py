@@ -56,6 +56,12 @@ def download_datasets(datasets, use_kaggle=True):
         script = ROOT / "datasets" / f"download_{ds}.sh"
         if script.exists():
             run(f"bash {script}", check=False)
+        elif ds == "kaggle_multiclass":
+            # public Kaggle multiclass supplement (3-class: Normal/Fastener_defective/Rail_defective)
+            mc_dir = ROOT / "datasets" / "kaggle_multiclass" / "Raillway-Track-Multiclass-dataset"
+            if not mc_dir.exists() or len(list(mc_dir.rglob("*.jpg"))) < 1000:
+                print("kaggle_multiclass missing (<1000), downloading salmaneunus/railwayfaultmulticlassdataset...")
+                run(f"kaggle datasets download -d salmaneunus/railwayfaultmulticlassdataset -p {ROOT}/datasets/kaggle_multiclass --unzip", check=False)
         else:
             print(f"No script for {ds}")
     # Fallbacks for surface_faults if Mendeley 404: use Kaggle mirror
@@ -91,12 +97,13 @@ def download_datasets(datasets, use_kaggle=True):
                         run(f"cp -r {inp/'data'/c} {ROOT}/datasets/railsense/ 2>&1 | head", check=False)
 
 def build_manifest():
-    run(f"{sys.executable} ml/dataset_tools/convert_to_manifest.py --datasets railsense surface_faults")
-    run(f"{sys.executable} ml/dataset_tools/prepare_yolo.py")
+    run(f"{sys.executable} ml/dataset_tools/convert_to_manifest.py --datasets railsense surface_faults kaggle_multiclass")
+    run(f"{sys.executable} ml/dataset_tools/prepare_yolo.py")                 # 7-class surface layout
+    run(f"{sys.executable} ml/dataset_tools/prepare_yolo.py --task multiclass")  # 3-class multiclass layout
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--datasets", nargs="+", default=["railsense","surface_faults"])
+    ap.add_argument("--datasets", nargs="+", default=["railsense","surface_faults","kaggle_multiclass"])
     ap.add_argument("--kaggle-key", type=str, default=None, help="path to kaggle.json")
     ap.add_argument("--skip-install", action="store_true")
     ap.add_argument("--skip-download", action="store_true")
