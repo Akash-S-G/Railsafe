@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 PIPELINE_DIR = ROOT / "experiments" / "results" / "pipeline"
 UPLOAD_DIR = ROOT / "experiments" / "results" / "uploads"
 

@@ -1,30 +1,8 @@
-# Raw datasets — never commit (manifest only)
-datasets/railsense/
-datasets/track_surface_faults/*.zip
-datasets/track_surface_faults/*.jpg
-datasets/track_surface_faults/Railway\ Track\ Surface\ Faults\ Dataset/
-datasets/rfdd/*.h5
-datasets/rfdd/*.png
-datasets/rfdd/*.zip
-datasets/rfdd/RFDD-code/
-datasets/raildb/
-datasets/raildb/Rail-Detection-code/
-datasets/temporal/
-datasets/*.zip
-datasets/manifest.jsonl.bak
-# Kaggle cache + derived (generated locally — do not commit to avoid Kaggle pull conflicts)
-datasets/track_surface_faults/test-xception.zip
-datasets/railsense/*.zip
-datasets/railsense/data/
-datasets/yolo_surface/
-datasets/surface_data.yaml
-datasets/manifest.jsonl
-datasets/kaggle_multiclass/
-datasets/yolo_multiclass/
-datasets/multiclass_data.yaml
-datasets/uploads/
-datasets/pipeline/
-
+# Datasets — ignore all data, keep only scripts + README (manifest only)
+datasets/*
+!datasets/README.md
+!datasets/download_*.sh
+!datasets/.gitkeep
 # Outputs / Logs
 output/
 runs/
@@ -84,7 +62,6 @@ kaggle.json
 *.pth
 *.onnx
 *.h5
-!datasets/**/*.h5
 yolo*.pt
 best_model.keras
 *.weights
@@ -106,4 +83,3 @@ tmp/
 temp/
 *.tmp
 *.temp
-datasets/kaggle_upload_pkg/
